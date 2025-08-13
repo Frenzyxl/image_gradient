@@ -11,14 +11,12 @@ function App() {
     setImage(file);
     setResultUrl(null);
     if (file) {
-      // Show a short hash (first 8 chars of sha256) or just the file name
       window.crypto.subtle.digest('SHA-256', file.slice(0, 10000)).then(hashBuffer => {
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         const baseName = file.name && file.name.trim() ? file.name : 'pasted_image';
         setSelectedName(`${baseName} (${hashHex.slice(0, 8)})`);
       }).catch(() => setSelectedName(file.name || 'pasted_image'));
-      // Set download name
       const nameToUse = file.name && file.name.includes('.') ? file.name : (file.name || 'pasted_image.png');
       const dotIdx = nameToUse.lastIndexOf('.');
       if (dotIdx > 0) {
@@ -35,6 +33,41 @@ function App() {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     setImageFromFile(file);
+  };
+
+  const handlePasteAreaPaste = async (e) => {
+    if (loading) return;
+    const items = e.clipboardData?.items || [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) setImageFromFile(file);
+        e.preventDefault();
+        return;
+      }
+    }
+    const files = e.clipboardData?.files || [];
+    if (files.length > 0) {
+      setImageFromFile(files[0]);
+      e.preventDefault();
+      return;
+    }
+    const text = e.clipboardData?.getData('text/plain');
+    if (text && /^https?:\/\//i.test(text)) {
+      try {
+        const res = await fetch(text);
+        const blob = await res.blob();
+        if (blob.type && blob.type.startsWith('image/')) {
+          const ext = (blob.type.split('/')[1] || 'png').split(';')[0];
+          const file = new File([blob], `pasted_image.${ext}`, { type: blob.type });
+          setImageFromFile(file);
+          e.preventDefault();
+        }
+      } catch {
+        // ignore
+      }
+    }
   };
 
   useEffect(() => {
@@ -79,10 +112,6 @@ function App() {
     setLoading(true);
     const formData = new FormData();
     formData.append("image", image);
-    // const res = await fetch("http://127.0.0.1:5000/process", {
-    //   method: "POST",
-    //   body: formData,
-    // });
     const res = await fetch("https://image-gradient-backend.onrender.com/process", {
       method: "POST",
       body: formData,
@@ -106,11 +135,22 @@ function App() {
           <input
             type="file"
             accept="image/*"
+            capture="environment"
             onChange={handleImageChange}
             className="w-full border border-gray-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition bg-gray-50"
             required={!image}
           />
-          <div className="mt-2 text-xs text-gray-500">Tip: You can also paste an image (Cmd+V / Ctrl+V).</div>
+          <div className="mt-2 text-xs text-gray-500">Tip: You can also paste an image (Cmd+V / Ctrl+V). On mobile, tap the box below, long-press, then Paste.</div>
+          <div
+            className="mt-3 w-full border-2 border-dashed border-indigo-300 rounded-lg p-4 text-sm text-gray-600 bg-indigo-50/40"
+            contentEditable
+            suppressContentEditableWarning
+            role="textbox"
+            aria-label="Paste image here"
+            onPaste={handlePasteAreaPaste}
+          >
+            Tap here, then long-press and choose Paste to paste an image or image URL on mobile.
+          </div>
           {selectedName && (
             <div className="mt-3 flex items-center">
               <span className="inline-block bg-indigo-100 text-indigo-700 text-xs font-mono rounded-full px-3 py-1 border border-indigo-200 shadow-sm">
