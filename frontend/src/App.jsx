@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 function App() {
   const [image, setImage] = useState(null);
@@ -7,8 +7,7 @@ function App() {
   const [selectedName, setSelectedName] = useState("");
   const [downloadName, setDownloadName] = useState("gradient_image.png");
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
+  const setImageFromFile = (file) => {
     setImage(file);
     setResultUrl(null);
     if (file) {
@@ -16,20 +15,63 @@ function App() {
       window.crypto.subtle.digest('SHA-256', file.slice(0, 10000)).then(hashBuffer => {
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        setSelectedName(`${file.name} (${hashHex.slice(0, 8)})`);
-      }).catch(() => setSelectedName(file.name));
+        const baseName = file.name && file.name.trim() ? file.name : 'pasted_image';
+        setSelectedName(`${baseName} (${hashHex.slice(0, 8)})`);
+      }).catch(() => setSelectedName(file.name || 'pasted_image'));
       // Set download name
-      const dotIdx = file.name.lastIndexOf('.');
+      const nameToUse = file.name && file.name.includes('.') ? file.name : (file.name || 'pasted_image.png');
+      const dotIdx = nameToUse.lastIndexOf('.');
       if (dotIdx > 0) {
-        setDownloadName(file.name.slice(0, dotIdx) + '_gradient' + file.name.slice(dotIdx));
+        setDownloadName(nameToUse.slice(0, dotIdx) + '_gradient' + nameToUse.slice(dotIdx));
       } else {
-        setDownloadName(file.name + '_gradient');
+        setDownloadName(nameToUse + '_gradient');
       }
     } else {
       setSelectedName("");
       setDownloadName("gradient_image.png");
     }
   };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    setImageFromFile(file);
+  };
+
+  useEffect(() => {
+    const onPaste = async (e) => {
+      if (loading) return;
+      const items = e.clipboardData?.items || [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type && item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) setImageFromFile(file);
+          return;
+        }
+      }
+      const files = e.clipboardData?.files || [];
+      if (files.length > 0) {
+        setImageFromFile(files[0]);
+        return;
+      }
+      const text = e.clipboardData?.getData('text/plain');
+      if (text && /^https?:\/\//i.test(text)) {
+        try {
+          const res = await fetch(text);
+          const blob = await res.blob();
+          if (blob.type && blob.type.startsWith('image/')) {
+            const ext = (blob.type.split('/')[1] || 'png').split(';')[0];
+            const file = new File([blob], `pasted_image.${ext}`, { type: blob.type });
+            setImageFromFile(file);
+          }
+        } catch {
+          // Ignore paste text fetch errors
+        }
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [loading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,8 +108,9 @@ function App() {
             accept="image/*"
             onChange={handleImageChange}
             className="w-full border border-gray-300 rounded-lg px-3 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition bg-gray-50"
-            required
+            required={!image}
           />
+          <div className="mt-2 text-xs text-gray-500">Tip: You can also paste an image (Cmd+V / Ctrl+V).</div>
           {selectedName && (
             <div className="mt-3 flex items-center">
               <span className="inline-block bg-indigo-100 text-indigo-700 text-xs font-mono rounded-full px-3 py-1 border border-indigo-200 shadow-sm">
@@ -83,7 +126,7 @@ function App() {
         >
           {loading ? (
             <span className="flex items-center justify-center">
-              <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+              <svg className="animate-spin h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a 8 8 0 018-8v8z"></path></svg>
               Processing...
             </span>
           ) : (
