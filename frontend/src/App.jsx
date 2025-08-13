@@ -37,6 +37,10 @@ function App() {
     setLoading(true);
     const formData = new FormData();
     formData.append("image", image);
+    // const res = await fetch("http://127.0.0.1:5000/process", {
+    //   method: "POST",
+    //   body: formData,
+    // });
     const res = await fetch("https://image-gradient-backend.onrender.com/process", {
       method: "POST",
       body: formData,

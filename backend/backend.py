@@ -46,7 +46,7 @@ def apply_gradient(image, color, fade_height_ratio=0.45):
         faded.paste(white_gradient, (0, 0), white_gradient)
     return faded
 
-def overlay_logo(image, logo, margin=32, scale=0.18):
+def overlay_logo(image, logo, margin=0, scale=0.5):
     img_w, img_h = image.size
     # Resize logo
     logo = logo.convert('RGBA')
@@ -54,7 +54,7 @@ def overlay_logo(image, logo, margin=32, scale=0.18):
     logo_h = int(logo_w * logo.height / logo.width)
     logo = logo.resize((logo_w, logo_h), Image.LANCZOS)
     # Position at bottom right
-    pos = (img_w - logo.width - margin, img_h - logo.height - margin)
+    pos = (img_w - logo.width - margin + 50, img_h - logo.height - margin + 50)
     image.paste(logo, pos, logo)
     return image
 
@@ -95,7 +95,7 @@ def process():
         logo = Image.open(logo_file)
     else:
         # Use default logo from backend_assets
-        default_logo_path = os.path.join(os.path.dirname(__file__), 'backend_assets', 'logo.JPG')
+        default_logo_path = os.path.join(os.path.dirname(__file__), 'backend_assets', 'logo.png')
         logo = Image.open(default_logo_path)
     faded = overlay_logo(faded, logo)
     # Save to buffer
